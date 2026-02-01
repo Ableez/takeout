@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "convex deploy --cmd 'npm run build:next'",
+    "build:next": "next build",
     "check": "next lint && tsc --noEmit",
     "dev": "npm-run-all --parallel dev:next dev:convex",
     "dev:next": "next dev --turbo",
