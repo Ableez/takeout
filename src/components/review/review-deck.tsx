@@ -3,7 +3,6 @@
 import { useMutation } from "convex/react";
 import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "#/components/ui/button";
 import { SwipeCard } from "./swipe-card";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
@@ -15,7 +14,7 @@ interface ReviewDeckProps {
 }
 
 export function ReviewDeck({ takeouts, categories, onComplete }: ReviewDeckProps) {
-  const [swipedCards, setSwipedCards] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const moveTakeout = useMutation(api.takeouts.move);
 
@@ -29,72 +28,81 @@ export function ReviewDeck({ takeouts, categories, onComplete }: ReviewDeckProps
     [categories]
   );
 
-  const remainingTakeouts = takeouts.filter((t: Doc<"takeouts">) => !swipedCards.includes(t._id));
-
-  const handleSwipe = async (direction: "left" | "right", takeoutId: string) => {
-    setSwipedCards((prev) => [...prev, takeoutId]);
+  const handleSwipe = async (direction: "left" | "right") => {
+    const takeout = takeouts[currentIndex];
+    if (!takeout) return;
 
     // Move to appropriate category
     const targetCategory = direction === "right" ? doneCategory : laterCategory;
     if (targetCategory) {
       await moveTakeout({
-        id: takeoutId as Id<"takeouts">,
+        id: takeout._id as Id<"takeouts">,
         categoryId: targetCategory._id,
       });
     }
 
-    // Check if done
-    if (remainingTakeouts.length <= 1) {
-      setTimeout(onComplete, 500);
+    // Move to next card
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= takeouts.length) {
+      setTimeout(onComplete, 300);
+    } else {
+      setCurrentIndex(nextIndex);
     }
   };
 
-  const outOfCards = remainingTakeouts.length === 0;
-
   if (takeouts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-lg font-medium">Nothing to review.</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Add some takeouts first.
-        </p>
+      <div className="flex flex-col items-center justify-center py-16 text-center animate-in fade-in-0">
+        <p className="text-sm text-muted-foreground">Nothing to review</p>
       </div>
     );
   }
 
+  const remaining = takeouts.length - currentIndex;
+  const isComplete = currentIndex >= takeouts.length;
+
   return (
     <div className="flex flex-col items-center">
       {/* Card Stack */}
-      <div className="relative h-80 w-80 sm:w-96">
-        {remainingTakeouts.map((takeout: Doc<"takeouts">) => (
-          <SwipeCard
-            key={takeout._id}
-            takeout={takeout}
-            onSwipe={(dir) => handleSwipe(dir, takeout._id)}
-          />
-        ))}
-
-        {outOfCards && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-lg font-medium">All done.</p>
+      <div className="relative h-80 w-80 sm:w-96 sm:h-96">
+        {isComplete ? (
+          <div className="flex h-full flex-col items-center justify-center text-center animate-in fade-in-0 zoom-in-95">
+            <p className="text-base font-medium">All done</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              That wasn't so hard, was it?
+              That was easy
             </p>
           </div>
+        ) : (
+          <>
+            {/* Show up to 3 cards in stack */}
+            {takeouts.slice(currentIndex, currentIndex + 3).map((takeout, index) => (
+              <SwipeCard
+                key={takeout._id}
+                takeout={takeout}
+                onSwipe={handleSwipe}
+                isTop={index === 0}
+              />
+            ))}
+          </>
         )}
       </div>
 
       {/* Instructions */}
-      {!outOfCards && (
-        <div className="mt-8 flex items-center gap-8 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <ChevronLeft className="h-4 w-4" />
-            <span>Later</span>
+      {!isComplete && (
+        <div className="mt-8 flex flex-col items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-2">
+          <div className="flex items-center gap-8 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <ChevronLeft className="h-4 w-4" />
+              <span>Later</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Done</span>
+              <ChevronRight className="h-4 w-4" />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span>Done</span>
-            <ChevronRight className="h-4 w-4" />
-          </div>
+          <p className="text-xs text-muted-foreground/50 tabular-nums">
+            {remaining} remaining
+          </p>
         </div>
       )}
     </div>

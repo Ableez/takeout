@@ -2,18 +2,19 @@ export type ContentSegment =
   | { type: "text"; value: string }
   | { type: "link"; value: string; href: string }
   | { type: "hashtag"; value: string; tag: string }
-  | { type: "mention"; value: string; id: string };
+  | { type: "mention"; value: string; id: string }
+  | { type: "todo"; value: string; checked: boolean; text: string };
 
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const HASHTAG_REGEX = /#(\w+)/g;
 const MENTION_REGEX = /@([\w-]+)/g;
+const TODO_REGEX = /\[([x ])\]\s+(.+?)(?=\n|$)/gi;
 
 export function parseContent(content: string): ContentSegment[] {
   const segments: ContentSegment[] = [];
   let lastIndex = 0;
 
-  // Combined regex to match all special patterns
-  const combinedRegex = /(https?:\/\/[^\s]+)|#(\w+)|@([\w-]+)/g;
+  // Combined regex to match all special patterns including todos
+  const combinedRegex = /(https?:\/\/[^\s]+)|#(\w+)|@([\w-]+)|\[([x ])\]\s+([^\n]+)/gi;
   let match;
 
   while ((match = combinedRegex.exec(content)) !== null) {
@@ -25,7 +26,7 @@ export function parseContent(content: string): ContentSegment[] {
       });
     }
 
-    const [fullMatch, url, hashtag, mention] = match;
+    const [fullMatch, url, hashtag, mention, todoCheck, todoText] = match;
 
     if (url) {
       segments.push({
@@ -44,6 +45,13 @@ export function parseContent(content: string): ContentSegment[] {
         type: "mention",
         value: `@${mention}`,
         id: mention,
+      });
+    } else if (todoCheck !== undefined && todoText) {
+      segments.push({
+        type: "todo",
+        value: fullMatch,
+        checked: todoCheck.toLowerCase() === "x",
+        text: todoText.trim(),
       });
     }
 
@@ -93,4 +101,22 @@ export function extractMentionIds(content: string): string[] {
   MENTION_REGEX.lastIndex = 0;
 
   return mentions;
+}
+
+export function extractTodos(content: string): { total: number; completed: number } {
+  const matches = content.matchAll(TODO_REGEX);
+  let total = 0;
+  let completed = 0;
+
+  for (const match of matches) {
+    total++;
+    if (match[1].toLowerCase() === "x") {
+      completed++;
+    }
+  }
+
+  // Reset regex
+  TODO_REGEX.lastIndex = 0;
+
+  return { total, completed };
 }

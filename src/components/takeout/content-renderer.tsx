@@ -1,6 +1,8 @@
 "use client";
 
 import { parseContent } from "#/lib/parse-content";
+import { CheckCircle2, Circle } from "lucide-react";
+import { cn } from "#/lib/utils";
 
 interface ContentRendererProps {
   content: string;
@@ -10,7 +12,7 @@ export function ContentRenderer({ content }: ContentRendererProps) {
   const segments = parseContent(content);
 
   return (
-    <span className="whitespace-pre-wrap break-words">
+    <span className="whitespace-pre-wrap wrap-break-word">
       {segments.map((segment, index) => {
         switch (segment.type) {
           case "text":
@@ -32,7 +34,7 @@ export function ContentRenderer({ content }: ContentRendererProps) {
             return (
               <span
                 key={index}
-                className="text-primary"
+                className="text-primary font-medium"
               >
                 {segment.value}
               </span>
@@ -44,6 +46,25 @@ export function ContentRenderer({ content }: ContentRendererProps) {
                 className="text-primary font-medium"
               >
                 {segment.value}
+              </span>
+            );
+          case "todo":
+            return (
+              <span
+                key={index}
+                className="flex items-start gap-2 my-1"
+              >
+                {segment.checked ? (
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-(--todo-complete)" />
+                ) : (
+                  <Circle className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                )}
+                <span className={cn(
+                  "flex-1",
+                  segment.checked && "line-through text-muted-foreground"
+                )}>
+                  {segment.text}
+                </span>
               </span>
             );
           default:

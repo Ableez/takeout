@@ -1,11 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button } from "#/components/ui/button";
-import { Input } from "#/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { Column } from "./column";
 import { TakeoutEditor } from "#/components/takeout/editor";
@@ -19,31 +16,17 @@ interface BoardProps {
 export function Board({ projectId }: BoardProps) {
   const [selectedCategory, setSelectedCategory] = useState<Id<"categories"> | null>(null);
   const [editingTakeout, setEditingTakeout] = useState<Doc<"takeouts"> | null>(null);
-  const [showNewCategory, setShowNewCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [expandedColumn, setExpandedColumn] = useState<Id<"categories"> | null>(null);
 
   const categories = useQuery(api.categories.listByProject, { projectId });
   const takeouts = useQuery(api.takeouts.listByProject, { projectId });
-
-  const createCategory = useMutation(api.categories.create);
-  const updateCategory = useMutation(api.categories.update);
-  const deleteCategory = useMutation(api.categories.remove);
 
   const createTakeout = useMutation(api.takeouts.create);
   const updateTakeout = useMutation(api.takeouts.update);
   const moveTakeout = useMutation(api.takeouts.move);
   const deleteTakeout = useMutation(api.takeouts.remove);
-
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    try {
-      await createCategory({ projectId, name: newCategoryName.trim() });
-      setNewCategoryName("");
-      setShowNewCategory(false);
-    } catch {
-      toast.error("Failed to create category");
-    }
-  };
+  const updateCategory = useMutation(api.categories.update);
+  const deleteCategory = useMutation(api.categories.remove);
 
   const handleCreateTakeout = async (
     content: string,
@@ -60,9 +43,9 @@ export function Board({ projectId }: BoardProps) {
         mentions,
       });
       setSelectedCategory(null);
-      toast.success("Takeout added");
+      toast.success("Added");
     } catch {
-      toast.error("Failed to add takeout");
+      toast.error("Failed to add");
     }
   };
 
@@ -80,9 +63,9 @@ export function Board({ projectId }: BoardProps) {
         mentions,
       });
       setEditingTakeout(null);
-      toast.success("Takeout updated");
+      toast.success("Updated");
     } catch {
-      toast.error("Failed to update takeout");
+      toast.error("Failed to update");
     }
   };
 
@@ -93,45 +76,64 @@ export function Board({ projectId }: BoardProps) {
         categoryId: categoryId as Id<"categories">,
       });
     } catch {
-      toast.error("Failed to move takeout");
+      toast.error("Failed to move");
     }
   };
 
   const handleDeleteTakeout = async (takeoutId: string) => {
     try {
       await deleteTakeout({ id: takeoutId as Id<"takeouts"> });
-      toast.success("Takeout deleted");
+      toast.success("Deleted");
     } catch {
-      toast.error("Failed to delete takeout");
+      toast.error("Failed to delete");
     }
   };
 
   if (!categories || !takeouts) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] gap-4 overflow-x-auto p-4">
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className="h-full w-80 flex-shrink-0 animate-pulse rounded-lg border border-border bg-muted/30 md:w-full"
-          />
-        ))}
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary/20 border-t-primary" />
       </div>
     );
   }
 
   const getTakeoutsForCategory = (categoryId: Id<"categories">): Doc<"takeouts">[] =>
-    (takeouts as Doc<"takeouts">[])
-      .filter((t) => t.categoryId === categoryId)
-      .sort((a, b) => b.createdAt - a.createdAt);
+    takeouts
+      .filter((t: Doc<"takeouts">) => t.categoryId === categoryId)
+      .sort((a: Doc<"takeouts">, b: Doc<"takeouts">) => b.createdAt - a.createdAt);
+
+  // Find the middle (active) category - "In progress"
+  const activeCategory = categories.find((c: Doc<"categories">) => c.order === 1);
+
+  // Auto-expand the active column on mount
+  const getColumnState = (categoryId: Id<"categories">) => {
+    if (expandedColumn) {
+      return expandedColumn === categoryId ? "expanded" : "collapsed";
+    }
+    // Default: middle column expanded
+    const cat = categories.find((c: Doc<"categories">) => c._id === categoryId);
+    return cat?.order === 1 ? "expanded" : "collapsed";
+  };
+
+  const handleColumnClick = (categoryId: Id<"categories">) => {
+    setExpandedColumn(categoryId);
+  };
 
   // Mobile view with tabs
   const MobileBoard = () => (
-    <Tabs defaultValue={categories[0]?._id} className="flex h-[calc(100vh-8rem)] flex-col">
-      <TabsList className="mx-4 mt-2 grid w-auto" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
+    <Tabs 
+      defaultValue={activeCategory?._id ?? categories[0]?._id} 
+      className="flex h-[calc(100vh-4rem)] flex-col"
+    >
+      <TabsList className="mx-4 mt-4 grid h-12 w-auto rounded-2xl bg-muted/50 p-1" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
         {categories.map((category: Doc<"categories">) => (
-          <TabsTrigger key={category._id} value={category._id} className="text-xs">
+          <TabsTrigger 
+            key={category._id} 
+            value={category._id} 
+            className="text-sm font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl transition-all"
+          >
             {category.name}
-            <span className="ml-1 text-muted-foreground">
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary tabular-nums">
               {getTakeoutsForCategory(category._id).length}
             </span>
           </TabsTrigger>
@@ -153,17 +155,20 @@ export function Board({ projectId }: BoardProps) {
             onEditTakeout={setEditingTakeout}
             onUpdateCategory={(name) => updateCategory({ id: category._id, name })}
             onDeleteCategory={() => deleteCategory({ id: category._id })}
+            state="expanded"
+            onExpand={() => undefined}
           />
         </TabsContent>
       ))}
     </Tabs>
   );
 
-  // Desktop view with columns
+  // Desktop view with collapsible columns
   const DesktopBoard = () => (
-    <div className="flex h-[calc(100vh-8rem)] gap-4 p-4">
-      <div className="grid grid-cols-3 gap-4 w-full">
-        {categories.map((category: Doc<"categories">) => (
+    <div className="flex h-[calc(100vh-4rem)] gap-3 p-4">
+      {categories.map((category: Doc<"categories">) => {
+        const state = getColumnState(category._id);
+        return (
           <Column
             key={category._id}
             category={category}
@@ -175,9 +180,11 @@ export function Board({ projectId }: BoardProps) {
             onEditTakeout={setEditingTakeout}
             onUpdateCategory={(name) => updateCategory({ id: category._id, name })}
             onDeleteCategory={() => deleteCategory({ id: category._id })}
+            state={state}
+            onExpand={() => handleColumnClick(category._id)}
           />
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 

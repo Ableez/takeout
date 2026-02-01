@@ -12,6 +12,7 @@ import {
 import { Input } from "#/components/ui/input";
 import { ScrollArea } from "#/components/ui/scroll-area";
 import { TakeoutCard } from "./takeout-card";
+import { cn } from "#/lib/utils";
 import type { Doc } from "../../../convex/_generated/dataModel";
 
 interface ColumnProps {
@@ -24,6 +25,8 @@ interface ColumnProps {
   onEditTakeout: (takeout: Doc<"takeouts">) => void;
   onUpdateCategory: (name: string) => void;
   onDeleteCategory: () => void;
+  state: "expanded" | "collapsed";
+  onExpand: () => void;
 }
 
 export function Column({
@@ -36,6 +39,8 @@ export function Column({
   onEditTakeout,
   onUpdateCategory,
   onDeleteCategory,
+  state,
+  onExpand,
 }: ColumnProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(category.name);
@@ -47,10 +52,47 @@ export function Column({
     setIsEditing(false);
   };
 
+  const isCollapsed = state === "collapsed";
+
+  // Collapsed view (desktop only)
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={onExpand}
+        className={cn(
+          "group flex h-full w-14 flex-shrink-0 flex-col items-center rounded-2xl",
+          "bg-muted/40 border-2 border-transparent hover:border-primary/30",
+          "transition-all duration-300 ease-out cursor-pointer hover:shadow-sm"
+        )}
+      >
+        <div className="flex h-12 w-full items-center justify-center border-b border-border/50">
+          <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+            {takeouts.length}
+          </span>
+        </div>
+        <div className="flex flex-1 items-center py-4">
+          <span 
+            className="text-sm font-semibold text-muted-foreground whitespace-nowrap"
+            style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+          >
+            {category.name}
+          </span>
+        </div>
+      </button>
+    );
+  }
+
   return (
-    <div className="flex h-full flex-col rounded-lg border border-border bg-muted/30 md:min-w-0">
-      {/* Header - hidden on mobile since tabs show the name */}
-      <div className="hidden md:flex items-center justify-between border-b border-border px-3 py-2">
+    <div 
+      className={cn(
+        "flex h-full flex-col rounded-2xl",
+        "bg-muted/40 border-2 border-transparent",
+        "transition-all duration-300 ease-out",
+        "flex-1 min-w-0"
+      )}
+    >
+      {/* Header */}
+      <div className="flex h-14 items-center justify-between gap-2 border-b border-border/50 px-4">
         {isEditing ? (
           <Input
             value={editName}
@@ -63,44 +105,48 @@ export function Column({
                 setIsEditing(false);
               }
             }}
-            className="h-7 text-sm font-medium"
+            className="h-9 text-sm font-semibold bg-transparent border-none focus-visible:ring-1"
             autoFocus
           />
         ) : (
-          <h3 className="text-sm font-medium">
+          <h3 className="text-sm font-bold truncate">
             {category.name}
-            <span className="ml-2 text-muted-foreground">
+            <span className="ml-2.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary tabular-nums">
               {takeouts.length}
             </span>
           </h3>
         )}
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             variant="ghost"
-            size="icon"
-            className="h-7 w-7"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-primary"
             onClick={onAddTakeout}
           >
             <Plus className="h-4 w-4" />
-            <span className="sr-only">Add takeout</span>
+            <span className="sr-only">Add</span>
           </Button>
 
           {!category.isDefault && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Button 
+                  variant="ghost" 
+                  size="icon-sm" 
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">More</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                <DropdownMenuItem onClick={() => setIsEditing(true)} className="rounded-lg">
                   <Pencil className="mr-2 h-4 w-4" />
                   Rename
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="text-destructive focus:text-destructive rounded-lg"
                   onClick={onDeleteCategory}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -112,22 +158,10 @@ export function Column({
         </div>
       </div>
 
-      {/* Mobile: Add button at top */}
-      <div className="flex items-center justify-end p-2 md:hidden">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAddTakeout}
-          className="gap-1"
-        >
-          <Plus className="h-4 w-4" />
-          Add
-        </Button>
-      </div>
-
-      <ScrollArea className="flex-1 px-2 pb-2 md:p-2">
-        <div className="space-y-2">
-          {takeouts.map((takeout) => (
+      {/* Content */}
+      <ScrollArea className="flex-1">
+        <div className="space-y-3 p-3">
+          {takeouts.map((takeout, index) => (
             <TakeoutCard
               key={takeout._id}
               takeout={takeout}
@@ -135,11 +169,17 @@ export function Column({
               onMove={(categoryId) => onMoveTakeout(takeout._id, categoryId)}
               onDelete={() => onDeleteTakeout(takeout._id)}
               onClick={() => onEditTakeout(takeout)}
+              style={{ 
+                animationDelay: `${index * 30}ms`,
+              }}
             />
           ))}
           {takeouts.length === 0 && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Empty. How peaceful.
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="rounded-2xl bg-muted/50 p-4">
+                <Plus className="h-6 w-6 text-muted-foreground/50" />
+              </div>
+              <p className="mt-3 text-sm font-medium text-muted-foreground">Empty</p>
             </div>
           )}
         </div>
